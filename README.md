@@ -1,10 +1,10 @@
 ![demo](droidbot/resources/dummy_documents/DroidBot-GPT-demo.gif)
 
-# AutoDroid-0shot
+# DroidBot-GPT
 
 ## About
 
-AutoDroid-0shot is a GPT-powered GUI task automator for Android.
+DroidBot-GPT is a GPT-powered GUI task automator for Android.
 It can control a smartphone app automatically based on a natural language task description.
 It is built upon [DroidBot](https://github.com/honeynet/droidbot) with [ChatGPT](https://chat.openai.com/)-style APIs.
 
