@@ -13,7 +13,7 @@ A more advanced version (with app-specific memory injection and other optimizati
 
 Technical report of this repo:
 
-[Hao Wen, Hongming Wang, Jiaxuan Liu, Yuanchun Li. "AutoDroid-0shot: A Simple Baseline for GPT-powered UI-grounded Smartphone Task Automation in Android"](https://arxiv.org/abs/2304.07061)
+[Hao Wen, Hongming Wang, Jiaxuan Liu, Yuanchun Li. "DroidBot-GPT: GPT-powered UI Automation for Android"](https://arxiv.org/abs/2304.07061)
 
 
 ## How to install
