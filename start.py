@@ -5,7 +5,6 @@ from droidbot import input_manager
 from droidbot import input_policy
 from droidbot import env_manager
 from droidbot import DroidBot
-from droidbot.droidmaster import DroidMaster
 
 
 def parse_args():
@@ -13,7 +12,7 @@ def parse_args():
     parse command line input
     generate options including host name, port number
     """
-    parser = argparse.ArgumentParser(description="Start DroidBot to test an Android app.",
+    parser = argparse.ArgumentParser(description="Start DroidBot-GPT to execute a task.",
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-d", action="store", dest="device_serial", required=False,
                         help="The serial number of target device (use `adb devices` to find)")
@@ -21,7 +20,7 @@ def parse_args():
                         help="The file path to target APK")
     parser.add_argument("-o", action="store", dest="output_dir",
                         help="directory of output")
-    parser.add_argument("-task", action="store", dest="task", default="mingle around",
+    parser.add_argument("-task", action="store", dest="task", default="random explore",
                         help="the task to execute, in natural language")
 
     parser.add_argument("-script", action="store", dest="script_path",

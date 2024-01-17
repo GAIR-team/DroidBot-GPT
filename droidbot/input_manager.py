@@ -4,13 +4,7 @@ import subprocess
 import time
 
 from .input_event import EventLog
-from .input_policy import UtgBasedInputPolicy, UtgNaiveSearchPolicy, UtgGreedySearchPolicy, \
-                         UtgReplayPolicy, \
-                         ManualPolicy, TaskPolicy, \
-                         POLICY_NAIVE_DFS, POLICY_GREEDY_DFS, \
-                         POLICY_NAIVE_BFS, POLICY_GREEDY_BFS, \
-                         POLICY_REPLAY, POLICY_MEMORY_GUIDED, \
-                         POLICY_MANUAL, POLICY_MONKEY, POLICY_NONE, POLICY_TASK
+from .input_policy import *
 
 DEFAULT_POLICY = POLICY_GREEDY_DFS
 DEFAULT_EVENT_INTERVAL = 1
@@ -73,9 +67,6 @@ class InputManager(object):
             input_policy = UtgNaiveSearchPolicy(device, app, self.random_input, self.policy_name)
         elif self.policy_name in [POLICY_GREEDY_DFS, POLICY_GREEDY_BFS]:
             input_policy = UtgGreedySearchPolicy(device, app, self.random_input, self.policy_name)
-        elif self.policy_name == POLICY_MEMORY_GUIDED:
-            from .input_policy2 import MemoryGuidedPolicy
-            input_policy = MemoryGuidedPolicy(device, app, self.random_input)
         elif self.policy_name == POLICY_REPLAY:
             input_policy = UtgReplayPolicy(device, app, self.replay_output)
         elif self.policy_name == POLICY_MANUAL:

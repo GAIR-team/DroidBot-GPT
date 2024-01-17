@@ -34,7 +34,6 @@ POLICY_MANUAL = "manual"
 POLICY_MONKEY = "monkey"
 POLICY_TASK = "task"
 POLICY_NONE = "none"
-POLICY_MEMORY_GUIDED = "memory_guided"  # implemented in input_policy2
 
 
 class InputInterruptedException(Exception):
@@ -129,9 +128,6 @@ class UtgBasedInputPolicy(InputPolicy):
         self.current_state = None
         self.utg = UTG(device=device, app=app, random_input=random_input)
         self.script_event_idx = 0
-        if self.device.humanoid is not None:
-            self.humanoid_view_trees = []
-            self.humanoid_events = []
 
     def generate_event(self):
         """
@@ -147,13 +143,6 @@ class UtgBasedInputPolicy(InputPolicy):
             return KeyEvent(name="BACK")
 
         self.__update_utg()
-
-        # update last view trees for humanoid
-        if self.device.humanoid is not None:
-            self.humanoid_view_trees = self.humanoid_view_trees + [self.current_state.view_tree]
-            if len(self.humanoid_view_trees) > 4:
-                self.humanoid_view_trees = self.humanoid_view_trees[1:]
-
         event = None
 
         # if the previous operation is not finished, continue
@@ -172,12 +161,6 @@ class UtgBasedInputPolicy(InputPolicy):
 
         if event is None:
             event = self.generate_event_based_on_utg()
-
-        # update last events for humanoid
-        if self.device.humanoid is not None:
-            self.humanoid_events = self.humanoid_events + [event]
-            if len(self.humanoid_events) > 3:
-                self.humanoid_events = self.humanoid_events[1:]
 
         self.last_state = self.current_state
         self.last_event = event
@@ -441,11 +424,6 @@ class UtgGreedySearchPolicy(UtgBasedInputPolicy):
         elif self.search_method == POLICY_GREEDY_BFS:
             possible_events.insert(0, KeyEvent(name="BACK"))
 
-        # get humanoid result, use the result to sort possible events
-        # including back events
-        if self.device.humanoid is not None:
-            possible_events = self.__sort_inputs_by_humanoid(possible_events)
-
         # If there is an unexplored event, try the event first
         for input_event in possible_events:
             if not self.utg.is_event_explored(event=input_event, state=current_state):
@@ -471,71 +449,6 @@ class UtgGreedySearchPolicy(UtgBasedInputPolicy):
         self.logger.info("Cannot find an exploration target. Trying to restart app...")
         self.__event_trace += EVENT_FLAG_STOP_APP
         return IntentEvent(intent=stop_app_intent)
-
-    def __sort_inputs_by_humanoid(self, possible_events):
-        if sys.version.startswith("3"):
-            from xmlrpc.client import ServerProxy
-        else:
-            from xmlrpclib import ServerProxy
-        proxy = ServerProxy("http://%s/" % self.device.humanoid)
-        request_json = {
-            "history_view_trees": self.humanoid_view_trees,
-            "history_events": [x.__dict__ for x in self.humanoid_events],
-            "possible_events": [x.__dict__ for x in possible_events],
-            "screen_res": [self.device.display_info["width"],
-                           self.device.display_info["height"]]
-        }
-        result = json.loads(proxy.predict(json.dumps(request_json)))
-        new_idx = result["indices"]
-        text = result["text"]
-        new_events = []
-
-        # get rid of infinite recursive by randomizing first event
-        if not self.utg.is_state_reached(self.current_state):
-            new_first = random.randint(0, len(new_idx) - 1)
-            new_idx[0], new_idx[new_first] = new_idx[new_first], new_idx[0]
-
-        for idx in new_idx:
-            if isinstance(possible_events[idx], SetTextEvent):
-                possible_events[idx].text = text
-            new_events.append(possible_events[idx])
-        return new_events
-
-    def __get_nav_target(self, current_state):
-        # If last event is a navigation event
-        if self.__nav_target and self.__event_trace.endswith(EVENT_FLAG_NAVIGATE):
-            navigation_steps = self.utg.get_navigation_steps(from_state=current_state, to_state=self.__nav_target)
-            if navigation_steps and 0 < len(navigation_steps) <= self.__nav_num_steps:
-                # If last navigation was successful, use current nav target
-                self.__nav_num_steps = len(navigation_steps)
-                return self.__nav_target
-            else:
-                # If last navigation was failed, add nav target to missing states
-                self.__missed_states.add(self.__nav_target.state_str)
-
-        reachable_states = self.utg.get_reachable_states(current_state)
-        if self.random_input:
-            random.shuffle(reachable_states)
-
-        for state in reachable_states:
-            # Only consider foreground states
-            if state.get_app_activity_depth(self.app) != 0:
-                continue
-            # Do not consider missed states
-            if state.state_str in self.__missed_states:
-                continue
-            # Do not consider explored states
-            if self.utg.is_state_explored(state):
-                continue
-            self.__nav_target = state
-            navigation_steps = self.utg.get_navigation_steps(from_state=current_state, to_state=self.__nav_target)
-            if len(navigation_steps) > 0:
-                self.__nav_num_steps = len(navigation_steps)
-                return state
-
-        self.__nav_target = None
-        self.__nav_num_steps = -1
-        return None
 
 
 class UtgReplayPolicy(InputPolicy):
@@ -737,13 +650,24 @@ class TaskPolicy(UtgBasedInputPolicy):
         self.__event_trace += EVENT_FLAG_STOP_APP
         return IntentEvent(intent=stop_app_intent)
         
-    def _query_llm(self, prompt):
-        import requests
-        URL = os.environ['GPT_URL']  # NOTE: replace with your own GPT API
-        body = {"model":"gpt-3.5-turbo","messages":[{"role":"user","content":prompt}],"stream":True}
-        headers = {'Content-Type': 'application/json', 'path': 'v1/chat/completions'}
-        r = requests.post(url=URL, json=body, headers=headers)
-        return r.content.decode()
+    def _query_llm(self, prompt, model_name='gpt-3.5-turbo'):
+        # TODO: replace with your own LLM
+        from openai import OpenAI
+        gpt_url = os.environ['GPT_URL']
+        gpt_key = os.environ['GPT_KEY']
+        client = OpenAI(
+            base_url=gpt_url,
+            api_key=gpt_key
+        )
+
+        messages=[{"role": "user", "content": prompt}]
+        completion = client.chat.completions.create(
+            messages=messages,
+            model=model_name,
+            timeout=30
+        )
+        res = completion.choices[0].message.content
+        return res
 
     def _get_action_with_LLM(self, current_state, action_history):
         task_prompt = f"I'm using a smartphone to {self.task}."
@@ -772,8 +696,4 @@ class TaskPolicy(UtgBasedInputPolicy):
             if len(selected_action.text) > 30:  # heuristically disable long text input
                 selected_action.text = ''
         return selected_action, candidate_actions
-        # except:
-        #     import traceback
-        #     traceback.print_exc()
-        #     return None, candidate_actions
 
